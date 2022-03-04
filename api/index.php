@@ -2,34 +2,70 @@
 
 header("Access-Control-Allow-Origin: *");
 error_reporting(E_ERROR | E_PARSE);
-$db = new SQLite3('/tmp/scores.sqlite', SQLITE3_OPEN_CREATE | SQLITE3_OPEN_READWRITE);
+
+$host = 'remotemysql.com:3306';
+$username = 'Wc89mjbD4r';
+$password = 'R9JP07iElm';
+$database = 'Wc89mjbD4r';
+$sqlConnection = mysqli_connect($host, $username, $password, $database);
+if (mysqli_connect_errno())
+{
+	die("Cannot connect to database");
+}
+
+function mysqlExists($conexion, $tabla, $condicion)
+{
+	$sql = "SELECT * FROM " . $tabla . " WHERE " . $condicion;
+	$sqlResult = mysqli_query($conexion, $sql);
+	$n = mysqli_num_rows($sqlResult);
+	if ($n > 0)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+function base64_to_jpeg($base64_string, $output_file)
+{
+	$imageData = base64_decode($base64_string);
+	$source = imagecreatefromstring($imageData);
+	$rotate = imagerotate($source, $angle, 0);
+	$imageSave = imagejpeg($rotate, $output_file, 100);
+	imagedestroy($source);
+}
 
 if ($_GET['x'] == "install")
 {
-	$db->query('CREATE TABLE IF NOT EXISTS "scores" (
-		"id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-		"custom_id" VARCHAR,
-		"name" VARCHAR,
-		"score" INTEGER,
-		"time" DATETIME,
-		"game_finished" BOOLEAN
-	)');
-	
-	echo "Database created successfully.";
+	if (mysqli_query($sqlConnection, 'CREATE TABLE IF NOT EXISTS scores (
+		id INT AUTO_INCREMENT PRIMARY KEY,
+		custom_id TEXT,
+		name TEXT,
+		score INT,
+		time TEXT,
+		game_finished INT
+	)'))
+	{
+		echo "Database created successfully.";
+	}
+	else
+	{
+		echo "Error.";
+	}
 }
 else if ($_GET['x'] == "submit_score")
 {
 	$myId = $_POST["id"];
 	$myName = $_POST["name"];
 	$myScore = $_POST["score"];
-	$myGameFinished = ($_POST["game_finished"] == "1" ? true : false);
-	$statement = $db->prepare('INSERT INTO "scores" ("name", "custom_id", "score", "time", "game_finished") VALUES (:name, :custom_id, :score, :time, :game_finished)');
-	$statement->bindValue(':name', $myName);
-	$statement->bindValue(':custom_id', $myId);
-	$statement->bindValue(':score', $myScore);
-	$statement->bindValue(':time', date('Y-m-d H:i:s'));
-	$statement->bindValue(':game_finished', $myGameFinished);
-	$statement->execute();
+	$myTime = date('Y-m-d H:i:s');
+	$myGameFinished = ($_POST["game_finished"] == "1" ? 1 : 0);
+	
+	$stmt = $sqlConnection->prepare('INSERT INTO scores (name, custom_id, score, time, game_finished) VALUES (?, ?, ?, ?, ?)');
+	$stmt->bind_param('ssisi', $myName, $myId, $myScore, $myTime, $myGameFinished);
+	$stmt->execute();
 	echo $myId;
 }
 else if ($_GET['x'] == "view_scores")
@@ -44,15 +80,19 @@ else if ($_GET['x'] == "view_scores")
 	$myId = $_POST["id"];
 	$myQueryNumber = (is_numeric($_POST["max"]) ? $_POST["max"] : 0);
 	$limitString = ($myQueryNumber > 0 ? " LIMIT " . $myQueryNumber : "");
-	$res = $db->query('SELECT custom_id, name, score, time, game_finished FROM scores' . $limitString);
-	while ($row = $res->fetchArray())
+	if ($stmt = $sqlConnection->prepare('SELECT custom_id, name, score, time, game_finished FROM scores' . $limitString))
 	{
-		$length ++;
-		$xYou[] = ($row['custom_id'] == $myId ? true : false);
-		$xNames[] = $row['name'];
-		$xScores[] = $row['score'];
-		$xTimes[] = $row['time'];
-		$xFinished[] = $row['game_finished'];
+		$stmt->execute();
+		$stmt->bind_result($resultId, $resultName, $resultScore, $resultTime, $resultGameFinished);
+		while ($stmt->fetch())
+		{
+			$length ++;
+			$xYou[] = ($resultId == $myId ? true : false);
+			$xNames[] = $resultName;
+			$xScores[] = $resultScore;
+			$xTimes[] = $resultTime;
+			$xFinished[] = $resultGameFinished;
+		}
 	}
 	
 	$array = array
@@ -111,19 +151,23 @@ else
 			  <tbody>
 				<?php
 					$c = 0;
-					$res = $db->query('SELECT custom_id, name, score, time, game_finished FROM scores ORDER BY score DESC' . $limitString);
-					while ($row = $res->fetchArray())
+					if ($stmt = $sqlConnection->prepare('SELECT custom_id, name, score, time, game_finished FROM scores ORDER BY score DESC' . $limitString))
 					{
-						$c ++;
+						$stmt->execute();
+						$stmt->bind_result($resultId, $resultName, $resultScore, $resultTime, $resultGameFinished);
+						while ($stmt->fetch())
+						{
+							$c ++;
 				?>
 						<tr>
 						  <th scope="row"><?php echo $c; ?></th>
-						  <td><?php echo $row["name"]; ?></td>
-						  <td><?php echo $row["score"]; ?></td>
-						  <td><?php echo $row["time"]; ?></td>
-						  <td><?php echo ($row["game_finished"] == 1 ? "Yes" : "No"); ?></td>
+						  <td><?php echo $resultName; ?></td>
+						  <td><?php echo $resultScore; ?></td>
+						  <td><?php echo $resultTime; ?></td>
+						  <td><?php echo ($resultGameFinished == 1 ? "Yes" : "No"); ?></td>
 						</tr>
 				<?php
+						}
 					}
 				?>
 			  </tbody>
@@ -142,5 +186,5 @@ else
 	<?php
 }
 
-$db->close();
+
 ?>
