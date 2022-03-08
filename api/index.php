@@ -37,76 +37,105 @@ function base64_to_jpeg($base64_string, $output_file)
 	imagedestroy($source);
 }
 
+$app = $_POST['app'];
+$validApp = preg_match("/^[a-zA-Z0-9]+$/", $app);
 if ($_GET['x'] == "install")
 {
-	if (mysqli_query($sqlConnection, 'CREATE TABLE IF NOT EXISTS scores (
-		id INT AUTO_INCREMENT PRIMARY KEY,
-		custom_id TEXT,
-		name TEXT,
-		score INT,
-		time TEXT,
-		game_finished INT
-	)'))
+	if ($validApp)
 	{
-		echo "Database created successfully.";
-	}
-	else
-	{
-		echo "Error.";
+		if (mysqli_query($sqlConnection, 'CREATE TABLE IF NOT EXISTS scores_' . $app . ' (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			custom_id TEXT,
+			name TEXT,
+			score INT,
+			time TEXT,
+			game_finished INT
+		)'))
+		{
+			echo "Database created successfully. " . $app;
+		}
+		else
+		{
+			echo "Error.";
+		}
 	}
 }
 else if ($_GET['x'] == "submit_score")
 {
-	$myId = $_POST["id"];
-	$myName = $_POST["name"];
-	$myScore = $_POST["score"];
-	$myTime = date('Y-m-d H:i:s');
-	$myGameFinished = ($_POST["game_finished"] == "1" ? 1 : 0);
-	
-	$stmt = $sqlConnection->prepare('INSERT INTO scores (name, custom_id, score, time, game_finished) VALUES (?, ?, ?, ?, ?)');
-	$stmt->bind_param('ssisi', $myName, $myId, $myScore, $myTime, $myGameFinished);
-	$stmt->execute();
-	echo $myId;
+	if ($validApp)
+	{
+		$myId = $_POST["id"];
+		$myName = $_POST["name"];
+		$myScore = $_POST["score"];
+		$myTime = date('Y-m-d H:i:s');
+		$myGameFinished = ($_POST["game_finished"] == "1" ? 1 : 0);
+		
+		$stmt = $sqlConnection->prepare('INSERT INTO scores_' . $app . ' (name, custom_id, score, time, game_finished) VALUES (?, ?, ?, ?, ?)');
+		$stmt->bind_param('ssisi', $myName, $myId, $myScore, $myTime, $myGameFinished);
+		$stmt->execute();
+		$newId = $sqlConnection->insert_id;
+		echo $newId;
+	}
+}
+else if ($_GET['x'] == "update_score")
+{
+	if ($validApp)
+	{
+		$dbId = $_POST["db_id"];
+		$myId = $_POST["id"];
+		$myName = $_POST["name"];
+		$myScore = $_POST["score"];
+		$myTime = date('Y-m-d H:i:s');
+		$myGameFinished = ($_POST["game_finished"] == "1" ? 1 : 0);
+		
+		$stmt = $sqlConnection->prepare('UPDATE scores_' . $app . ' SET name = ?, custom_id = ?, score = ?, time = ?, game_finished = ? WHERE id = ?');
+		$stmt->bind_param('ssisii', $myName, $myId, $myScore, $myTime, $myGameFinished, $dbId);
+		$stmt->execute();
+		echo $myId;
+	}
 }
 else if ($_GET['x'] == "view_scores")
 {
-	$xYou = array();
-	$xScores = array();
-	$xNames = array();
-	$xTimes = array();
-	$xFinished = array();
-	
-	$length = 0;
-	$myId = $_POST["id"];
-	$myQueryNumber = (is_numeric($_POST["max"]) ? $_POST["max"] : 0);
-	$limitString = ($myQueryNumber > 0 ? " LIMIT " . $myQueryNumber : "");
-	if ($stmt = $sqlConnection->prepare('SELECT custom_id, name, score, time, game_finished FROM scores' . $limitString))
+	if ($validApp)
 	{
-		$stmt->execute();
-		$stmt->bind_result($resultId, $resultName, $resultScore, $resultTime, $resultGameFinished);
-		while ($stmt->fetch())
+		$xYou = array();
+		$xScores = array();
+		$xNames = array();
+		$xTimes = array();
+		$xFinished = array();
+		
+		$length = 0;
+		$myId = $_POST["id"];
+		$myQueryNumber = (is_numeric($_POST["max"]) ? $_POST["max"] : 0);
+		$limitString = ($myQueryNumber > 0 ? " LIMIT " . $myQueryNumber : "");
+		if ($stmt = $sqlConnection->prepare('SELECT custom_id, name, score, time, game_finished FROM scores_' . $app . $limitString))
 		{
-			$length ++;
-			$xYou[] = ($resultId == $myId ? true : false);
-			$xNames[] = $resultName;
-			$xScores[] = $resultScore;
-			$xTimes[] = $resultTime;
-			$xFinished[] = $resultGameFinished;
+			$stmt->execute();
+			$stmt->bind_result($resultId, $resultName, $resultScore, $resultTime, $resultGameFinished);
+			while ($stmt->fetch())
+			{
+				$length ++;
+				$xYou[] = ($resultId == $myId ? true : false);
+				$xNames[] = $resultName;
+				$xScores[] = $resultScore;
+				$xTimes[] = $resultTime;
+				$xFinished[] = $resultGameFinished;
+			}
 		}
+		
+		$array = array
+		(
+			'length' => $length,
+			'score' => $xScores,
+			'name' => $xNames,
+			'time' => $xTimes,
+			'game_finished' => $xFinished,
+			'you' => $xYou,
+		);
+		
+		$myJSON = json_encode($array, JSON_PRETTY_PRINT);
+		echo $myJSON;
 	}
-	
-	$array = array
-	(
-		'length' => $length,
-		'score' => $xScores,
-		'name' => $xNames,
-		'time' => $xTimes,
-		'game_finished' => $xFinished,
-		'you' => $xYou,
-	);
-	
-	$myJSON = json_encode($array, JSON_PRETTY_PRINT);
-	echo $myJSON;
 }
 else
 {
