@@ -108,7 +108,7 @@ else if ($_GET['x'] == "view_scores")
 		$myId = $_POST["id"];
 		$myQueryNumber = (is_numeric($_POST["max"]) ? $_POST["max"] : 0);
 		$limitString = ($myQueryNumber > 0 ? " LIMIT " . $myQueryNumber : "");
-		if ($stmt = $sqlConnection->prepare('SELECT custom_id, name, score, time, game_finished FROM scores_' . $app . $limitString))
+		if ($stmt = $sqlConnection->prepare('SELECT custom_id, name, score, time, game_finished FROM scores_' . $app . ' ORDER BY score DESC' . $limitString))
 		{
 			$stmt->execute();
 			$stmt->bind_result($resultId, $resultName, $resultScore, $resultTime, $resultGameFinished);
@@ -180,7 +180,7 @@ else
 			  <tbody>
 				<?php
 					$c = 0;
-					if ($stmt = $sqlConnection->prepare('SELECT custom_id, name, score, time, game_finished FROM scores ORDER BY score DESC' . $limitString))
+					if ($stmt = $sqlConnection->prepare('SELECT custom_id, name, score, time, game_finished FROM scores_plantfrens ORDER BY score DESC' . $limitString))
 					{
 						$stmt->execute();
 						$stmt->bind_result($resultId, $resultName, $resultScore, $resultTime, $resultGameFinished);
