@@ -125,16 +125,15 @@ else if ($_GET['x'] == "view_scores")
 		
 		$array = array
 		(
-			'length' => $length,
+			'count' => $length,
 			'score' => $xScores,
-			'name' => $xNames,
+			'player_name' => $xNames,
 			'time' => $xTimes,
 			'game_finished' => $xFinished,
 			'you' => $xYou,
 		);
 		
-		//$myJSON = json_encode($array, JSON_PRETTY_PRINT);
-		$myJSON = json_encode($array);
+		$myJSON = json_encode($array, JSON_PRETTY_PRINT);
 		echo $myJSON;
 	}
 }
